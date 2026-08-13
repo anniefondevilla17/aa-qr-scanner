@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <title>Attendance QR Scanner</title>
+
+  <!-- QR SCANNER LIBRARY -->
+  <script
+    src="https://unpkg.com/html5-qrcode"
+    type="text/javascript">
+  </script>
+
+  <style>
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      color: #202124;
+    }
+
+    .container {
+      max-width: 460px;
+      margin: 30px auto;
+    }
+
+    .card {
+      background: #ffffff;
+      border-radius: 18px;
+      padding: 30px 22px;
+      box-shadow: 0 4px 18px rgba(0,0,0,0.10);
+      text-align: center;
+    }
+
+    .icon {
+      width: 70px;
+      height: 70px;
+      margin: 0 auto 16px;
+      border-radius: 16px;
+      background: #174ea6;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 38px;
+      font-weight: bold;
+    }
+
+    h1 {
+      margin: 5px 0 10px;
+      font-size: 28px;
+    }
+
+    .subtitle {
+      margin-bottom: 25px;
+      font-size: 16px;
+      color: #5f6368;
+      line-height: 1.5;
+    }
+
+    #reader {
+      width: 100%;
+      margin-top: 18px;
+      overflow: hidden;
+      border-radius: 12px;
+    }
+
+    button {
+      width: 100%;
+      padding: 17px;
+      margin-top: 12px;
+      border: none;
+      border-radius: 10px;
+      font-size: 17px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .primary {
+      background: #174ea6;
+      color: #ffffff;
+    }
+
+    .secondary {
+      background: #e8eaed;
+      color: #202124;
+    }
+
+    #stopButton {
+      display: none;
+    }
+
+    #message {
+      margin-top: 18px;
+      font-size: 15px;
+      line-height: 1.5;
+    }
+
+    .success {
+      padding: 16px;
+      border-radius: 10px;
+      background: #e6f4ea;
+      color: #137333;
+    }
+
+    .error {
+      padding: 16px;
+      border-radius: 10px;
+      background: #fce8e6;
+      color: #b3261e;
+    }
+
+    .footer {
+      margin-top: 25px;
+      padding-top: 16px;
+      border-top: 1px solid #e8eaed;
+      font-size: 12px;
+      color: #777777;
+    }
+
+  </style>
+
+</head>
+
+
+<body>
+
+<div class="container">
+
+  <div class="card">
+
+    <div class="icon">
+      ▣
+    </div>
+
+    <h1>
+      Employee QR Scanner
+    </h1>
+
+    <div class="subtitle">
+      Scan your registered QR code to continue.
+    </div>
+
+
+    <button
+      id="startButton"
+      class="primary"
+      onclick="startScanner()"
+    >
+      START QR SCANNER
+    </button>
+
+
+    <div id="reader"></div>
+
+
+    <button
+      id="stopButton"
+      class="secondary"
+      onclick="stopScanner()"
+    >
+      CANCEL
+    </button>
+
+
+    <div id="message"></div>
+
+
+    <div class="footer">
+      Attendance QR Scanner
+    </div>
+
+  </div>
+
+</div>
+
+
+<script>
+
+
+/************************************************************
+ * GOOGLE APPS SCRIPT ATTENDANCE PORTAL
+ ************************************************************/
+
+const ATTENDANCE_APP_URL =
+  'https://script.google.com/macros/s/AKfycbxr189dwCoXTZosM_uPTauEU24_siBj4AMZbmVtkj4WjOVh73KFC5TwmeI5Sfyd4_4/exec';
+
+
+/************************************************************
+ * GLOBAL VARIABLES
+ ************************************************************/
+
+let qrScanner = null;
+
+let scannerBusy = false;
+
+
+/************************************************************
+ * START QR SCANNER
+ ************************************************************/
+
+function startScanner() {
+
+  const message =
+    document.getElementById('message');
+
+
+  scannerBusy = false;
+
+
+  document
+    .getElementById('startButton')
+    .style.display = 'none';
+
+
+  document
+    .getElementById('stopButton')
+    .style.display = 'block';
+
+
+  message.innerHTML =
+    'Starting camera...';
+
+
+  /********************************************************
+   * CHECK QR LIBRARY
+   ********************************************************/
+
+  if (
+    typeof Html5Qrcode ===
+    'undefined'
+  ) {
+
+    message.innerHTML =
+      '<div class="error">' +
+      'QR scanner could not be loaded. ' +
+      'Please refresh the page and try again.' +
+      '</div>';
+
+    resetScannerScreen();
+
+    return;
+
+  }
+
+
+  /********************************************************
+   * GET AVAILABLE CAMERAS
+   ********************************************************/
+
+  Html5Qrcode
+    .getCameras()
+
+    .then(function(cameras) {
+
+
+      if (
+        !cameras ||
+        cameras.length === 0
+      ) {
+
+        throw new Error(
+          'No camera was detected.'
+        );
+
+      }
+
+
+      /******************************************************
+       * FIND REAR CAMERA
+       ******************************************************/
+
+      let selectedCamera =
+        cameras[0];
+
+
+      for (
+        let i = 0;
+        i < cameras.length;
+        i++
+      ) {
+
+        const label =
+          String(
+            cameras[i].label || ''
+          ).toLowerCase();
+
+
+        if (
+          label.includes('back') ||
+          label.includes('rear') ||
+          label.includes('environment')
+        ) {
+
+          selectedCamera =
+            cameras[i];
+
+          break;
+
+        }
+
+      }
+
+
+      /******************************************************
+       * CREATE SCANNER
+       ******************************************************/
+
+      qrScanner =
+        new Html5Qrcode(
+          'reader'
+        );
+
+
+      /******************************************************
+       * START CAMERA
+       ******************************************************/
+
+      return qrScanner.start(
+
+        selectedCamera.id,
+
+        {
+
+          fps: 10,
+
+          qrbox: {
+            width: 250,
+            height: 250
+          },
+
+          aspectRatio: 1
+
+        },
+
+
+        /****************************************************
+         * QR SUCCESS
+         ****************************************************/
+
+        function(decodedText) {
+
+
+          if (scannerBusy) {
+            return;
+          }
+
+
+          scannerBusy = true;
+
+
+          message.innerHTML =
+            '<div class="success">' +
+            '<strong>QR detected.</strong>' +
+            '<br><br>' +
+            'Opening Employee Portal...' +
+            '</div>';
+
+
+          stopScannerForRedirect(
+
+            function() {
+
+              openAttendancePortal(
+                decodedText
+              );
+
+            }
+
+          );
+
+        },
+
+
+        /****************************************************
+         * NORMAL SCAN ERRORS
+         ****************************************************/
+
+        function(scanError) {
+
+          // Ignore normal scan errors.
+          // Camera continues looking for a QR code.
+
+        }
+
+      );
+
+    })
+
+
+    .then(function() {
+
+      message.innerHTML =
+        'Point the camera at your registered QR code.';
+
+    })
+
+
+    .catch(function(error) {
+
+
+      console.error(
+        'Camera error:',
+        error
+      );
+
+
+      let errorMessage =
+        'Unable to start camera.';
+
+
+      if (
+        error &&
+        String(error)
+          .toLowerCase()
+          .includes('permission')
+      ) {
+
+        errorMessage =
+          'Camera permission was denied. ' +
+          'Please allow camera access and try again.';
+
+      }
+
+
+      message.innerHTML =
+        '<div class="error">' +
+
+        '<strong>' +
+        errorMessage +
+        '</strong>' +
+
+        '<br><br>' +
+
+        'Please open this page directly in Chrome or Safari.' +
+
+        '</div>';
+
+
+      resetScannerScreen();
+
+    });
+
+}
+
+
+/************************************************************
+ * OPEN EMPLOYEE ATTENDANCE PORTAL
+ ************************************************************/
+
+function openAttendancePortal(
+  qrValue
+) {
+
+  const qr =
+    String(
+      qrValue || ''
+    ).trim();
+
+
+  if (!qr) {
+
+    document
+      .getElementById('message')
+      .innerHTML =
+        '<div class="error">' +
+        'Unable to read QR code. Please try again.' +
+        '</div>';
+
+
+    resetScannerScreen();
+
+    return;
+
+  }
+
+
+  /********************************************************
+   * SEND QR VALUE TO APPS SCRIPT
+   ********************************************************/
+
+  const destination =
+    ATTENDANCE_APP_URL +
+    '?qr=' +
+    encodeURIComponent(qr);
+
+
+  window.location.replace(
+    destination
+  );
+
+}
+
+
+/************************************************************
+ * CANCEL SCANNER
+ ************************************************************/
+
+function stopScanner() {
+
+  stopScannerForRedirect(
+
+    function() {
+
+      resetScannerScreen();
+
+
+      document
+        .getElementById('message')
+        .innerHTML = '';
+
+    }
+
+  );
+
+}
+
+
+/************************************************************
+ * STOP CAMERA BEFORE REDIRECT
+ ************************************************************/
+
+function stopScannerForRedirect(
+  callback
+) {
+
+  if (!qrScanner) {
+
+    if (callback) {
+      callback();
+    }
+
+    return;
+
+  }
+
+
+  qrScanner
+    .stop()
+
+    .then(function() {
+
+
+      try {
+
+        qrScanner.clear();
+
+      }
+
+      catch (error) {
+
+        // Ignore cleanup errors.
+
+      }
+
+
+      qrScanner = null;
+
+
+      if (callback) {
+        callback();
+      }
+
+    })
+
+
+    .catch(function(error) {
+
+
+      console.error(
+        'Scanner stop error:',
+        error
+      );
+
+
+      qrScanner = null;
+
+
+      if (callback) {
+        callback();
+      }
+
+    });
+
+}
+
+
+/************************************************************
+ * RESET SCANNER SCREEN
+ ************************************************************/
+
+function resetScannerScreen() {
+
+  scannerBusy = false;
+
+
+  try {
+
+    document
+      .getElementById('reader')
+      .innerHTML = '';
+
+  }
+
+  catch (error) {
+
+    // Ignore.
+
+  }
+
+
+  document
+    .getElementById('startButton')
+    .style.display = 'block';
+
+
+  document
+    .getElementById('stopButton')
+    .style.display = 'none';
+
+}
+
+
+</script>
+
+</body>
+
+</html>
