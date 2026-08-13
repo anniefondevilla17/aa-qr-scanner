@@ -436,17 +436,22 @@ function startScanner() {
 
 
       message.innerHTML =
-        '<div class="error">' +
+  '<div class="error">' +
 
-        '<strong>' +
-        errorMessage +
-        '</strong>' +
+  '<strong>Unable to start camera.</strong>' +
 
-        '<br><br>' +
+  '<br><br>' +
 
-        'Please open this page directly in Chrome or Safari.' +
+  'Please open this page directly in Chrome or Safari.' +
 
-        '</div>';
+  '<br><br>' +
+
+  '<small>' +
+  'Camera error: ' +
+  String(error) +
+  '</small>' +
+
+  '</div>';
 
 
       resetScannerScreen();
